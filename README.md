@@ -37,4 +37,65 @@ The first argument of the DISPLAY_CURSOR is the SQL ID for the statement. LIVESQ
 
 Passing NULL gets the plan for the last SQL statement run in this session. Using a SQL ID searches for plans in the cursor cache for that statement.
 
+## Find the SQL ID for a Statement
+- To get the SQL ID for a statement, search for it in v$sql:
+
+```sql
+select sql_id, sql_text
+from   v$sql
+where  sql_text like 'select *%bricks b%'
+/* exclude this query */
+and    sql_text not like '%not this%';
+
+```
+
+- The SQL ID is a hash of the statement's text. This means that changes to the formatting of a SQL statement will give it a new SQL ID, even though its meaning is identical. For example the only difference between these queries is the case of select. But they have different SQL IDs!
+
+```sql
+select *
+from   bricks b
+join   colours c
+on     b.colour = c.colour;
+
+SELECT *
+from   bricks b
+join   colours c
+on     b.colour = c.colour;
+
+select sql_id, sql_text
+from   v$sql
+where  sql_text like '%bricks%join%colours%'
+/* exclude this query */
+and    sql_text not like '%not this%';
+```
+
+## Using SQL ID in DBMS_XPlan
+- If you know the SQL ID for a statement, you can pass it directly to DBMS_XPlan:
+
+```sql
+select *
+from   bricks b
+join   colours c
+on     b.colour = c.colour;
+
+select * 
+from   table(dbms_xplan.display_cursor('1jqgaskqzc3tq'));
+```
+
+- If you don't know the SQL ID, but have the statement's text, you can lookup its SQL ID and pass it to DBMS_XPlan in one statement with this query:
+- The "statement's text" is 
+```sql
+select /* my statement text */* from colours;
+
+select p.*  
+from   v$sql s, table (  
+  dbms_xplan.display_cursor (  
+    s.sql_id, s.child_number, 'BASIC'  
+  )  
+) p  
+where s.sql_text like '%my statement text%'  /* enter text from the target statement here */
+and   s.sql_text not like '%not this%';
+```
+
+
 
